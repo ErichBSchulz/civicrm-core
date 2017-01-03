@@ -462,8 +462,7 @@ AND    u.status = 1
 
     if (!file_exists("$cmsPath/includes/bootstrap.inc")) {
       if ($throwError) {
-        echo '<br />Sorry, could not locate bootstrap.inc\n';
-        exit();
+        throw new Exception('Sorry, could not locate bootstrap.inc');
       }
       return FALSE;
     }
@@ -484,10 +483,15 @@ AND    u.status = 1
 
     // explicitly setting error reporting, since we cannot handle drupal related notices
     error_reporting(1);
-    if (!function_exists('module_exists') || !module_exists('civicrm')) {
+    if (!function_exists('module_exists')) {
       if ($throwError) {
-        echo '<br />Sorry, could not load drupal bootstrap.';
-        exit();
+        throw new Exception('Sorry, could not load drupal bootstrap.');
+      }
+      return FALSE;
+    }
+    if (!module_exists('civicrm')) {
+      if ($throwError) {
+        throw new Exception('Sorry, drupal cannot find CiviCRM');
       }
       return FALSE;
     }
@@ -519,8 +523,7 @@ AND    u.status = 1
         $uid = user_authenticate($name, $pass);
         if (!$uid) {
           if ($throwError) {
-            echo '<br />Sorry, unrecognized username or password.';
-            exit();
+            throw new Exception('Sorry, unrecognized username or password.');
           }
           return FALSE;
         }
@@ -537,8 +540,7 @@ AND    u.status = 1
     }
 
     if ($throwError) {
-      echo '<br />Sorry, can not load CMS user account.';
-      exit();
+      throw new Exception('Sorry, can not load CMS user account.');
     }
 
     // CRM-6948: When using loadBootStrap, it's implicit that CiviCRM has already loaded its settings
