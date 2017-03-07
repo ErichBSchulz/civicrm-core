@@ -270,6 +270,7 @@ input.crm-form-entityref {
     border: 1px solid #FF0000;
 }
 .crm-container input.crm-form-text,
+.crm-container .crm-icon-picker-button,
 .crm-container input.dateplugin {
   border: 1px solid #999;
   vertical-align: middle;
@@ -2841,6 +2842,20 @@ tbody.scrollContent tr.alternateRow {
 .crm-container form table label,
 .crm-container form table.report label {
   color: #3e3e3e;
+}
+
+.crm-container a.crm-icon-picker-button {
+  min-width: 10em;
+  text-align: inherit;
+  color: #3e3e3e;
+}
+
+.crm-container a.crm-icon-picker-button .ui-button-text {
+  color: #9f9f9f;
+}
+
+.crm-container a.crm-icon-picker-button.ui-button-text-only .ui-button-text {
+  padding: .4em .2em;
 }
 
 /* search results */

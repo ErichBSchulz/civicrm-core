@@ -3,7 +3,7 @@
  +--------------------------------------------------------------------+
  | CiviCRM version 4.7                                                |
  +--------------------------------------------------------------------+
- | Copyright CiviCRM LLC (c) 2004-2016                                |
+ | Copyright CiviCRM LLC (c) 2004-2017                                |
  +--------------------------------------------------------------------+
  | This file is a part of CiviCRM.                                    |
  |                                                                    |
@@ -115,7 +115,7 @@ class api_v3_ContributionPageTest extends CiviUnitTestCase {
       'currency' => 'NZD',
       'financial_type_id' => 1,
     );
-    $getResult = $this->callAPIAndDocument($this->_entity, 'get', $getParams, __FUNCTION__, __FILE__);
+    $getResult = $this->callAPISuccess($this->_entity, 'get', $getParams);
     $this->assertEquals(1, $getResult['count']);
   }
 
@@ -314,6 +314,52 @@ class api_v3_ContributionPageTest extends CiviUnitTestCase {
   }
 
   /**
+   * Test submit with a membership block in place works with renewal.
+   */
+  public function testSubmitMembershipBlockNotSeparatePaymentProcessorInstantRenew() {
+    $this->setUpMembershipContributionPage();
+    $dummyPP = Civi\Payment\System::singleton()->getByProcessor($this->_paymentProcessor);
+    $dummyPP->setDoDirectPaymentResult(array('payment_status_id' => 1));
+    $submitParams = array(
+      'price_' . $this->_ids['price_field'][0] => reset($this->_ids['price_field_value']),
+      'id' => (int) $this->_ids['contribution_page'],
+      'amount' => 10,
+      'billing_first_name' => 'Billy',
+      'billing_middle_name' => 'Goat',
+      'billing_last_name' => 'Gruff',
+      'selectMembership' => $this->_ids['membership_type'],
+      'payment_processor_id' => 1,
+      'credit_card_number' => '4111111111111111',
+      'credit_card_type' => 'Visa',
+      'credit_card_exp_date' => array('M' => 9, 'Y' => 2040),
+      'cvv2' => 123,
+    );
+
+    $this->callAPISuccess('contribution_page', 'submit', $submitParams);
+    $contribution = $this->callAPISuccess('contribution', 'getsingle', array('contribution_page_id' => $this->_ids['contribution_page']));
+    $membershipPayment = $this->callAPISuccess('membership_payment', 'getsingle', array('contribution_id' => $contribution['id']));
+    $this->callAPISuccessGetCount('LineItem', array(
+      'entity_table' => 'civicrm_membership',
+      'entity_id' => $membershipPayment['id'],
+    ), 1);
+
+    $submitParams['contact_id'] = $contribution['contact_id'];
+
+    $this->callAPISuccess('contribution_page', 'submit', $submitParams);
+    $this->callAPISuccessGetCount('LineItem', array(
+      'entity_table' => 'civicrm_membership',
+      'entity_id' => $membershipPayment['id'],
+    ), 2);
+    $membership = $this->callAPISuccessGetSingle('Membership', array(
+      'id' => $membershipPayment['membership_id'],
+      'return' => array('end_date', 'join_date', 'start_date'),
+    ));
+    $this->assertEquals(date('Y-m-d'), $membership['start_date']);
+    $this->assertEquals(date('Y-m-d'), $membership['join_date']);
+    $this->assertEquals(date('Y-m-d', strtotime('+ 2 year - 1 day')), $membership['end_date']);
+  }
+
+  /**
    * Test submit with a membership block in place.
    */
   public function testSubmitMembershipBlockNotSeparatePaymentWithEmail() {
@@ -337,7 +383,7 @@ class api_v3_ContributionPageTest extends CiviUnitTestCase {
       'cvv2' => 123,
     );
 
-    $this->callAPIAndDocument('contribution_page', 'submit', $submitParams, __FUNCTION__, __FILE__, 'submit contribution page', NULL);
+    $this->callAPISuccess('contribution_page', 'submit', $submitParams);
     $contribution = $this->callAPISuccess('contribution', 'getsingle', array('contribution_page_id' => $this->_ids['contribution_page']));
     $this->callAPISuccess('membership_payment', 'getsingle', array('contribution_id' => $contribution['id']));
     $mut->checkMailLog(array(
@@ -367,7 +413,7 @@ class api_v3_ContributionPageTest extends CiviUnitTestCase {
       'email-Primary' => 'billy-goat@the-new-bridge.net',
     );
 
-    $this->callAPIAndDocument('contribution_page', 'submit', $submitParams, __FUNCTION__, __FILE__, 'submit contribution page', NULL);
+    $this->callAPISuccess('contribution_page', 'submit', $submitParams);
     $contribution = $this->callAPISuccess('contribution', 'getsingle', array('contribution_page_id' => $this->_ids['contribution_page']));
     $this->callAPISuccess('membership_payment', 'getsingle', array('contribution_id' => $contribution['id']));
     $mut->checkMailLog(array(
@@ -398,7 +444,7 @@ class api_v3_ContributionPageTest extends CiviUnitTestCase {
       'selectMembership' => $this->_ids['membership_type'],
     );
 
-    $this->callAPIAndDocument('contribution_page', 'submit', $submitParams, __FUNCTION__, __FILE__, 'submit contribution page', NULL);
+    $this->callAPISuccess('contribution_page', 'submit', $submitParams);
     $contributions = $this->callAPISuccess('contribution', 'get', array('contribution_page_id' => $this->_ids['contribution_page']));
     $this->assertCount(2, $contributions['values']);
     $lines = $this->callAPISuccess('LineItem', 'get', array('sequential' => 1));
@@ -433,7 +479,7 @@ class api_v3_ContributionPageTest extends CiviUnitTestCase {
       'cvv2' => 123,
     );
 
-    $this->callAPIAndDocument('contribution_page', 'submit', $submitParams, __FUNCTION__, __FILE__, 'submit contribution page', NULL);
+    $this->callAPISuccess('contribution_page', 'submit', $submitParams);
     $contributions = $this->callAPISuccess('contribution', 'get', array('contribution_page_id' => $this->_ids['contribution_page']));
     $this->assertCount(2, $contributions['values']);
     $membershipPayment = $this->callAPISuccess('membership_payment', 'getsingle', array());
@@ -1414,6 +1460,68 @@ class api_v3_ContributionPageTest extends CiviUnitTestCase {
       $priceFieldValue1['id'] => 1,
       $priceFieldValue2['id'] => 1,
     );
+  }
+
+  /**
+   * Test Tax Amount is calculated properly when using PriceSet with Field Type = Text/Numeric Quantity
+   */
+  public function testSubmitContributionPageWithPriceSetQuantity() {
+    $this->_priceSetParams['is_quick_config'] = 0;
+    $this->enableTaxAndInvoicing();
+    $financialType = $this->createFinancialType();
+    $financialTypeId = $financialType['id'];
+    // This function sets the Tax Rate at 10% - it currently has no way to pass Tax Rate into it - so let's work with 10%
+    $financialAccount = $this->relationForFinancialTypeWithFinancialAccount($financialType['id'], 5);
+
+    $this->setUpContributionPage();
+    $submitParams = array(
+      'price_' . $this->_ids['price_field'][0] => reset($this->_ids['price_field_value']),
+      'id' => (int) $this->_ids['contribution_page'],
+      'first_name' => 'J',
+      'last_name' => 'T',
+      'email' => 'JT@ohcanada.ca',
+      'is_pay_later' => TRUE,
+    );
+
+    // Create PriceSet/PriceField
+    $priceSetID = reset($this->_ids['price_set']);
+    $priceField = $this->callAPISuccess('price_field', 'create', array(
+      'price_set_id' => $priceSetID,
+      'label' => 'Printing Rights',
+      'html_type' => 'Text',
+    ));
+    $priceFieldValue = $this->callAPISuccess('price_field_value', 'create', array(
+      'price_set_id' => $priceSetID,
+      'price_field_id' => $priceField['id'],
+      'label' => 'Printing Rights',
+      'financial_type_id' => $financialTypeId,
+      'amount' => '16.95',
+    ));
+    $priceFieldId = $priceField['id'];
+
+    // Set quantity for our test
+    $submitParams['price_' . $priceFieldId] = 180;
+
+    // contribution_page submit requires amount and tax_amount - and that's ok we're not testing that - we're testing at the LineItem level
+    $submitParams['amount'] = 180 * 16.95;
+    // This is the correct Tax Amount - use it later to compare to what the CiviCRM Core came up with at the LineItem level
+    $submitParams['tax_amount'] = 180 * 16.95 * 0.10;
+
+    $this->callAPISuccess('contribution_page', 'submit', $submitParams);
+    $contribution = $this->callAPISuccessGetSingle('contribution', array(
+      'contribution_page_id' => $this->_ids['contribution_page'],
+    ));
+
+    // Retrieve the lineItem that belongs to the Printing Rights and check the tax_amount CiviCRM Core calculated for it
+    $lineItem = $this->callAPISuccess('LineItem', 'get', array(
+      'contribution_id' => $contribution['id'],
+      'label' => 'Printing Rights',
+    ));
+    $lineItemId = $lineItem['id'];
+    $lineItem_TaxAmount = round($lineItem['values'][$lineItemId]['tax_amount'], 2);
+
+    // Compare this to what it should be!
+    $this->assertEquals($lineItem_TaxAmount, round($submitParams['tax_amount'], 2), 'Wrong Sales Tax Amount is calculated and stored.');
   }
 
 }

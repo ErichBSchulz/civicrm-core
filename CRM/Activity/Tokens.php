@@ -4,7 +4,7 @@
  +--------------------------------------------------------------------+
  | CiviCRM version 4.7                                                |
  +--------------------------------------------------------------------+
- | Copyright CiviCRM LLC (c) 2004-2016                                |
+ | Copyright CiviCRM LLC (c) 2004-2017                                |
  +--------------------------------------------------------------------+
  | This file is a part of CiviCRM.                                    |
  |                                                                    |
@@ -28,7 +28,7 @@
 
 /**
  * @package CRM
- * @copyright CiviCRM LLC (c) 2004-2016
+ * @copyright CiviCRM LLC (c) 2004-2017
  */
 
 /**
@@ -45,13 +45,19 @@
  */
 class CRM_Activity_Tokens extends \Civi\Token\AbstractTokenSubscriber {
 
+  /**
+   * CRM_Activity_Tokens constructor.
+   */
   public function __construct() {
-    parent::__construct('activity', array(
-      'activity_id' => ts('Activity ID'),
-      'activity_type' => ts('Activity Type'),
-      'subject' => ts('Activity Subject'),
-      'details' => ts('Activity Details'),
-      'activity_date_time' => ts('Activity Date-Time'),
+    parent::__construct('activity', array_merge(
+      array(
+        'activity_id' => ts('Activity ID'),
+        'activity_type' => ts('Activity Type'),
+        'subject' => ts('Activity Subject'),
+        'details' => ts('Activity Details'),
+        'activity_date_time' => ts('Activity Date-Time'),
+      ),
+      $this->getCustomTokens('Activity')
     ));
   }
 
@@ -103,6 +109,9 @@ class CRM_Activity_Tokens extends \Civi\Token\AbstractTokenSubscriber {
     }
     elseif (isset($actionSearchResult->$field)) {
       $row->tokens($entity, $field, $actionSearchResult->$field);
+    }
+    elseif ($cfID = \CRM_Core_BAO_CustomField::getKeyID($field)) {
+      $row->customToken($entity, $cfID, $actionSearchResult->entity_id);
     }
     else {
       $row->tokens($entity, $field, '');

@@ -2,7 +2,7 @@
  +--------------------------------------------------------------------+
  | CiviCRM version 4.7                                                |
  +--------------------------------------------------------------------+
- | Copyright CiviCRM LLC (c) 2004-2016                                |
+ | Copyright CiviCRM LLC (c) 2004-2017                                |
  +--------------------------------------------------------------------+
  | This file is a part of CiviCRM.                                    |
  |                                                                    |
@@ -68,18 +68,14 @@
              </tr>
      {/if}
         {/if}
-      {if $gName eq 'case_status'}
-            <tr class="crm-admin-options-form-block-grouping">
-              <td class="label">{$form.grouping.label}</td>
-                <td>{$form.grouping.html}</td>
-            </tr>
-      {/if}
 
       {if $form.value.html && $gName neq 'redaction_rule'}
         <tr class="crm-admin-options-form-block-value">
           <td class="label">{$form.value.label}</td>
           <td>{$form.value.html}<br />
+            {if $action == 2}
               <span class="description"><i class="crm-i fa-exclamation-triangle"></i> {ts}Changing the Value field will unlink records which have been marked with this option. This change can not be undone except by restoring the previous value.{/ts}</span>
+            {/if}
           </td>
         </tr>
       {/if}
@@ -128,6 +124,12 @@
                 <td class="label">{$form.visibility_id.label}</td>
                 <td>{$form.visibility_id.html}</td>
               </tr>
+        {/if}
+        {if $form.grouping.html}
+          <tr class="crm-admin-options-form-block-grouping">
+            <td class="label">{$form.grouping.label}</td>
+            <td>{$form.grouping.html}</td>
+          </tr>
         {/if}
               <tr class="crm-admin-options-form-block-weight">
                 <td class="label">{$form.weight.label}</td>

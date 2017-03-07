@@ -3,7 +3,7 @@
  +--------------------------------------------------------------------+
  | CiviCRM version 4.7                                                |
  +--------------------------------------------------------------------+
- | Copyright CiviCRM LLC (c) 2004-2016                                |
+ | Copyright CiviCRM LLC (c) 2004-2017                                |
  +--------------------------------------------------------------------+
  | This file is a part of CiviCRM.                                    |
  |                                                                    |
@@ -28,7 +28,7 @@
 /**
  *
  * @package CRM
- * @copyright CiviCRM LLC (c) 2004-2016
+ * @copyright CiviCRM LLC (c) 2004-2017
  */
 
 /**
@@ -2172,6 +2172,12 @@ AND cl.modified_id  = c.id
           'activity_status' => array(
             'title' => ts('Activity Status'),
             'name' => 'activity_status',
+            'type' => CRM_Utils_Type::T_STRING,
+            'searchByLabel' => TRUE,
+          ),
+          'activity_priority' => array(
+            'title' => ts('Activity Priority'),
+            'name' => 'activity_priority',
             'type' => CRM_Utils_Type::T_STRING,
             'searchByLabel' => TRUE,
           ),

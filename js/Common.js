@@ -243,8 +243,16 @@ if (!CRM.vars) CRM.vars = {};
       var script = document.createElement('script');
       scriptsLoaded[url] = $.Deferred();
       script.onload = function () {
+        if (window.jQuery === CRM.$ && CRM.CMSjQuery) {
+          window.jQuery = CRM.CMSjQuery;
+        }
         scriptsLoaded[url].resolve();
       };
+      // Make jQuery global available while script is loading
+      if (window.jQuery !== CRM.$) {
+        CRM.CMSjQuery = window.jQuery;
+        window.jQuery = CRM.$;
+      }
       script.src = url;
       document.getElementsByTagName("head")[0].appendChild(script);
     }
@@ -765,58 +773,6 @@ if (!CRM.vars) CRM.vars = {};
     });
   };
 
-  $.fn.crmAjaxTable = function() {
-    // Strip the ids from ajax urls to make pageLength storage more generic
-    function simplifyUrl(ajax) {
-      // Datatables ajax prop could be a url string or an object containing the url
-      var url = typeof ajax === 'object' ? ajax.url : ajax;
-      return typeof url === 'string' ? url.replace(/[&?]\w*id=\d+/g, '') : null;
-    }
-
-    return $(this).each(function() {
-      // Recall pageLength for this table
-      var url = simplifyUrl($(this).data('ajax'));
-      if (url && window.localStorage && localStorage['dataTablePageLength:' + url]) {
-        $(this).data('pageLength', localStorage['dataTablePageLength:' + url]);
-      }
-      // Declare the defaults for DataTables
-      var defaults = {
-        "processing": true,
-        "serverSide": true,
-        "order": [],
-        "dom": '<"crm-datatable-pager-top"lfp>rt<"crm-datatable-pager-bottom"ip>',
-        "pageLength": 25,
-        "pagingType": "full_numbers",
-        "drawCallback": function(settings) {
-          //Add data attributes to cells
-          $('thead th', settings.nTable).each( function( index ) {
-            $.each(this.attributes, function() {
-              if(this.name.match("^cell-")) {
-                var cellAttr = this.name.substring(5);
-                var cellValue = this.value;
-                $('tbody tr', settings.nTable).each( function() {
-                  $('td:eq('+ index +')', this).attr( cellAttr, cellValue );
-                });
-              }
-            });
-          });
-          //Reload table after draw
-          $(settings.nTable).trigger('crmLoad');
-        }
-      };
-      //Include any table specific data
-      var settings = $.extend(true, defaults, $(this).data('table'));
-      // Remember pageLength
-      $(this).on('length.dt', function(e, settings, len) {
-        if (settings.ajax && window.localStorage) {
-          localStorage['dataTablePageLength:' + simplifyUrl(settings.ajax)] = len;
-        }
-      });
-      //Make the DataTables call
-      $(this).DataTable(settings);
-    });
-  };
-
   CRM.utils.formatSelect2Result = function (row) {
     var markup = '<div class="crm-select2-row">';
     if (row.image !== undefined) {
@@ -1037,14 +993,19 @@ if (!CRM.vars) CRM.vars = {};
       $('table.crm-ajax-table', e.target).each(function() {
         var
           $table = $(this),
+          script = CRM.config.resourceBase + 'js/jquery/jquery.crmAjaxTable.js',
           $accordion = $table.closest('.crm-accordion-wrapper.collapsed, .crm-collapsible.collapsed');
         // For tables hidden by collapsed accordions, wait.
         if ($accordion.length) {
           $accordion.one('crmAccordion:open', function() {
-            $table.crmAjaxTable();
+            CRM.loadScript(script).done(function() {
+              $table.crmAjaxTable();
+            });
           });
         } else {
-          $table.crmAjaxTable();
+          CRM.loadScript(script).done(function() {
+            $table.crmAjaxTable();
+          });
         }
       });
       if ($("input:radio[name=radio_ts]").size() == 1) {
@@ -1055,6 +1016,12 @@ if (!CRM.vars) CRM.vars = {};
       $('select.crm-chain-select-control', e.target).off('.chainSelect').on('change.chainSelect', chainSelect);
       $('.crm-form-text[data-crm-datepicker]', e.target).each(function() {
         $(this).crmDatepicker($(this).data('crmDatepicker'));
+      });
+      $('.crm-editable', e.target).not('thead *').each(function() {
+        var $el = $(this);
+        CRM.loadScript(CRM.config.resourceBase + 'js/jquery/jquery.crmEditable.js').done(function() {
+          $el.crmEditable();
+        });
       });
       // Cache Form Input initial values
       $('form[data-warn-changes] :input', e.target).each(function() {
@@ -1522,9 +1489,12 @@ if (!CRM.vars) CRM.vars = {};
         $(this).siblings('input:text').val('').trigger('change', ['crmClear']);
         return false;
       })
-      .on('change', 'input.crm-form-radio:checked, input[allowclear=1]', function(e, context) {
+      .on('change keyup', 'input.crm-form-radio:checked, input[allowclear=1]', function(e, context) {
         if (context !== 'crmClear' && ($(this).is(':checked') || ($(this).is('[allowclear=1]') && $(this).val()))) {
           $(this).siblings('.crm-clear-link').css({visibility: ''});
+        }
+        if (context !== 'crmClear' && $(this).is('[allowclear=1]') && $(this).val() === '') {
+          $(this).siblings('.crm-clear-link').css({visibility: 'hidden'});
         }
       })
 
@@ -1610,6 +1580,33 @@ if (!CRM.vars) CRM.vars = {};
     }
   };
 
+  // Sugar methods for window.localStorage, with a fallback for older browsers
+  var cacheItems = {};
+  CRM.cache = {
+    get: function (name, defaultValue) {
+      try {
+        if (localStorage.getItem('CRM' + name) !== null) {
+          return JSON.parse(localStorage.getItem('CRM' + name));
+        }
+      } catch(e) {}
+      return cacheItems[name] === undefined ? defaultValue : cacheItems[name];
+    },
+    set: function (name, value) {
+      try {
+        localStorage.setItem('CRM' + name, JSON.stringify(value));
+      } catch(e) {}
+      cacheItems[name] = value;
+    },
+    clear: function(name) {
+      try {
+        localStorage.removeItem('CRM' + name);
+      } catch(e) {}
+      delete cacheItems[name];
+    }
+  };
+
+
+
   // Determine if a user has a given permission.
   // @see CRM_Core_Resources::addPermissions
   CRM.checkPerm = function(perm) {
@@ -1631,8 +1628,11 @@ if (!CRM.vars) CRM.vars = {};
         return input;
 
       case 'string':
-        // convert iso format
-        return $.datepicker.parseDate('yy-mm-dd', input.substr(0, 10));
+        // convert iso format with or without dashes
+        if (input.indexOf('-') > 0) {
+          return $.datepicker.parseDate('yy-mm-dd', input.substr(0, 10));
+        }
+        return $.datepicker.parseDate('yymmdd', input.substr(0, 8));
 
       case 'number':
         // convert unix timestamp
@@ -1646,4 +1646,15 @@ if (!CRM.vars) CRM.vars = {};
   CRM.utils.formatDate = function(input, outputFormat) {
     return input ? $.datepicker.formatDate(outputFormat || CRM.config.dateInputFormat, CRM.utils.makeDate(input)) : '';
   };
+
+  // Used to set appropriate text color for a given background
+  CRM.utils.colorContrast = function (hexcolor) {
+    hexcolor = hexcolor.replace(/[ #]/g, '');
+    var r = parseInt(hexcolor.substr(0, 2), 16),
+     g = parseInt(hexcolor.substr(2, 2), 16),
+     b = parseInt(hexcolor.substr(4, 2), 16),
+     yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return (yiq >= 128) ? 'black' : 'white';
+  };
+
 })(jQuery, _);

@@ -3,7 +3,7 @@
  +--------------------------------------------------------------------+
  | CiviCRM version 4.7                                                |
  +--------------------------------------------------------------------+
- | Copyright CiviCRM LLC (c) 2004-2016                                |
+ | Copyright CiviCRM LLC (c) 2004-2017                                |
  +--------------------------------------------------------------------+
  | This file is a part of CiviCRM.                                    |
  |                                                                    |
@@ -28,7 +28,7 @@
 /**
  *
  * @package CRM
- * @copyright CiviCRM LLC (c) 2004-2016
+ * @copyright CiviCRM LLC (c) 2004-2017
  */
 
 /**
@@ -429,15 +429,6 @@ class CRM_Contribute_Form_AdditionalPayment extends CRM_Contribute_Form_Abstract
       if (!empty($submittedValues['is_email_receipt']) && $sendReceipt) {
         $statusMsg .= ' ' . ts('A receipt has been emailed to the contributor.');
       }
-      // email sending
-      if (!empty($result) && !empty($submittedValues['is_email_receipt'])) {
-        $submittedValues['contact_id'] = $this->_contactId;
-        $submittedValues['contribution_id'] = $this->_contributionId;
-        // to get 'from email id' for send receipt
-        $this->fromEmailId = $submittedValues['from_email_address'];
-        $sendReceipt = $this->emailReceipt($submittedValues);
-      }
-
       CRM_Core_Session::setStatus($statusMsg, ts('Saved'), 'success');
 
       $session = CRM_Core_Session::singleton();

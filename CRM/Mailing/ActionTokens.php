@@ -4,7 +4,7 @@
  +--------------------------------------------------------------------+
  | CiviCRM version 4.7                                                |
  +--------------------------------------------------------------------+
- | Copyright CiviCRM LLC (c) 2004-2016                                |
+ | Copyright CiviCRM LLC (c) 2004-2017                                |
  +--------------------------------------------------------------------+
  | This file is a part of CiviCRM.                                    |
  |                                                                    |
@@ -59,6 +59,13 @@ class CRM_Mailing_ActionTokens extends \Civi\Token\AbstractTokenSubscriber {
       'resubscribeUrl' => ts('Resubscribe URL (Action)'),
       'eventQueueId' => ts('Event Queue ID'),
     ));
+  }
+
+  /**
+   * @inheritDoc
+   */
+  public function checkActive(\Civi\Token\TokenProcessor $processor) {
+    return !empty($processor->context['mailingId']) || !empty($processor->context['mailing']);
   }
 
   /**
